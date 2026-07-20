@@ -15,5 +15,6 @@ frontend/.env*.local
 .DS_Store
 Thumbs.db
 
-# Claude Code
-.claude/
+# Claude Code — share skills, ignore local settings
+.claude/settings.local.json
+.claude/settings.json

@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 SEED = 42
 
 USERS = [
+    "harish.a.negi@accenture.com",
     "alice@accenture.com",
     "bob@accenture.com",
     "carol@accenture.com",
@@ -18,19 +19,21 @@ USERS = [
     "james@accenture.com",
 ]
 
+SDLC_ACTIVITIES = ["Requirements", "Development", "Testing", "Research"]
+
 MODELS = [
     "claude-haiku-4-5",
     "claude-sonnet-4-6",
     "claude-opus-4-8",
 ]
 
-# Pricing per million tokens
+# Pricing per million tokens (Claude 4.x rates, 2026)
 PRICING = {
     "claude-haiku-4-5": {
-        "input": 0.80,
-        "output": 4.00,
-        "cache_read": 0.08,
-        "cache_write": 1.00,
+        "input": 1.00,
+        "output": 5.00,
+        "cache_read": 0.10,
+        "cache_write": 1.25,
     },
     "claude-sonnet-4-6": {
         "input": 3.00,
@@ -39,10 +42,10 @@ PRICING = {
         "cache_write": 3.75,
     },
     "claude-opus-4-8": {
-        "input": 15.00,
-        "output": 75.00,
-        "cache_read": 1.50,
-        "cache_write": 18.75,
+        "input": 5.00,
+        "output": 25.00,
+        "cache_read": 0.50,
+        "cache_write": 6.25,
     },
 }
 
@@ -56,26 +59,38 @@ TOKEN_RANGES = {
 # User profiles: (activity_rate, models_weights, cache_hit_profile, request_multiplier)
 # cache_hit_profile: (min_cache_pct, max_cache_pct)
 USER_PROFILES = {
+    # activity_weights: [Requirements, Development, Testing, Research]
+    "harish.a.negi@accenture.com": {
+        "activity_rate": 0.92,
+        "model_weights": [0.25, 0.55, 0.20],
+        "cache_hit_range": (0.28, 0.52),
+        "cache_write_frac": 0.05,
+        "request_multiplier": 1.6,
+        "activity_weights": [0.08, 0.60, 0.20, 0.12],
+    },
     "alice@accenture.com": {
         "activity_rate": 0.95,
         "model_weights": [0.3, 0.5, 0.2],
         "cache_hit_range": (0.35, 0.65),
         "cache_write_frac": 0.05,
-        "request_multiplier": 2.0,  # high usage
+        "request_multiplier": 2.0,
+        "activity_weights": [0.10, 0.55, 0.25, 0.10],
     },
     "bob@accenture.com": {
         "activity_rate": 0.90,
         "model_weights": [0.4, 0.45, 0.15],
         "cache_hit_range": (0.30, 0.55),
         "cache_write_frac": 0.04,
-        "request_multiplier": 1.8,  # high usage
+        "request_multiplier": 1.8,
+        "activity_weights": [0.05, 0.65, 0.20, 0.10],
     },
     "carol@accenture.com": {
         "activity_rate": 0.75,
         "model_weights": [0.5, 0.4, 0.1],
-        "cache_hit_range": (0.0, 0.02),  # zero caching - optimization target
+        "cache_hit_range": (0.0, 0.02),
         "cache_write_frac": 0.01,
         "request_multiplier": 1.2,
+        "activity_weights": [0.20, 0.45, 0.15, 0.20],
     },
     "david@accenture.com": {
         "activity_rate": 0.70,
@@ -83,20 +98,23 @@ USER_PROFILES = {
         "cache_hit_range": (0.20, 0.40),
         "cache_write_frac": 0.04,
         "request_multiplier": 1.0,
+        "activity_weights": [0.10, 0.60, 0.25, 0.05],
     },
     "eve@accenture.com": {
         "activity_rate": 0.80,
-        "model_weights": [0.1, 0.2, 0.7],  # very high opus - optimization target
+        "model_weights": [0.1, 0.2, 0.7],
         "cache_hit_range": (0.10, 0.25),
         "cache_write_frac": 0.03,
         "request_multiplier": 1.3,
+        "activity_weights": [0.05, 0.30, 0.10, 0.55],  # heavy research
     },
     "frank@accenture.com": {
         "activity_rate": 0.85,
         "model_weights": [0.35, 0.5, 0.15],
-        "cache_hit_range": (0.60, 0.85),  # great cache hit rate
+        "cache_hit_range": (0.60, 0.85),
         "cache_write_frac": 0.08,
         "request_multiplier": 1.4,
+        "activity_weights": [0.05, 0.65, 0.25, 0.05],
     },
     "grace@accenture.com": {
         "activity_rate": 0.65,
@@ -104,6 +122,7 @@ USER_PROFILES = {
         "cache_hit_range": (0.25, 0.45),
         "cache_write_frac": 0.04,
         "request_multiplier": 0.9,
+        "activity_weights": [0.15, 0.50, 0.25, 0.10],
     },
     "henry@accenture.com": {
         "activity_rate": 0.60,
@@ -111,6 +130,7 @@ USER_PROFILES = {
         "cache_hit_range": (0.15, 0.35),
         "cache_write_frac": 0.03,
         "request_multiplier": 0.85,
+        "activity_weights": [0.10, 0.55, 0.25, 0.10],
     },
     "iris@accenture.com": {
         "activity_rate": 0.55,
@@ -118,6 +138,7 @@ USER_PROFILES = {
         "cache_hit_range": (0.20, 0.40),
         "cache_write_frac": 0.04,
         "request_multiplier": 0.8,
+        "activity_weights": [0.12, 0.52, 0.26, 0.10],
     },
     "james@accenture.com": {
         "activity_rate": 0.50,
@@ -125,6 +146,7 @@ USER_PROFILES = {
         "cache_hit_range": (0.10, 0.30),
         "cache_write_frac": 0.03,
         "request_multiplier": 0.75,
+        "activity_weights": [0.10, 0.55, 0.25, 0.10],
     },
 }
 
@@ -145,7 +167,7 @@ def generate_records() -> List[Dict[str, Any]]:
     rng = random.Random(SEED)
     records = []
 
-    end_date = date(2026, 6, 28)
+    end_date = date.today()
     start_date = end_date - timedelta(days=29)
 
     for day_offset in range(30):
@@ -198,11 +220,13 @@ def generate_records() -> List[Dict[str, Any]]:
                     total_cache_write += cache_write_tok
 
                 cost = calculate_cost(model, total_input, total_output, total_cache_read, total_cache_write)
+                activity = rng.choices(SDLC_ACTIVITIES, weights=profile["activity_weights"])[0]
 
                 records.append({
                     "date": date_str,
                     "user_id": user_id,
                     "model": model,
+                    "activity": activity,
                     "input_tokens": total_input,
                     "output_tokens": total_output,
                     "cache_read_tokens": total_cache_read,

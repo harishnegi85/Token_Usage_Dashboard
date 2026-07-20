@@ -4,7 +4,21 @@ from typing import List, Dict, Any, Optional
 from collections import defaultdict
 from datetime import date, timedelta
 
-from mock_data import get_all_records, MODELS, PRICING
+from mock_data import MODELS, PRICING
+
+try:
+    from claude_code_data import get_real_records as _get_real
+    _real = _get_real()
+    if _real:
+        DATA_SOURCE = "claude_code"
+        def get_all_records() -> List[Dict[str, Any]]:
+            return _get_real()
+    else:
+        DATA_SOURCE = "mock"
+        from mock_data import get_all_records
+except Exception:
+    DATA_SOURCE = "mock"
+    from mock_data import get_all_records
 
 app = FastAPI(title="Token Usage Dashboard API")
 
@@ -26,14 +40,14 @@ def parse_period(period: str) -> int:
 
 def get_records_for_period(days: int) -> List[Dict[str, Any]]:
     all_records = get_all_records()
-    end_date = date(2026, 6, 28)
+    end_date = date.today()
     start_date = end_date - timedelta(days=days - 1)
     return [r for r in all_records if r["date"] >= start_date.isoformat()]
 
 
 def get_records_for_previous_period(days: int) -> List[Dict[str, Any]]:
     all_records = get_all_records()
-    end_date = date(2026, 6, 28)
+    end_date = date.today()
     current_start = end_date - timedelta(days=days - 1)
     prev_end = current_start - timedelta(days=1)
     prev_start = prev_end - timedelta(days=days - 1)
@@ -41,10 +55,14 @@ def get_records_for_previous_period(days: int) -> List[Dict[str, Any]]:
 
 
 @app.get("/api/overview")
-async def get_overview(period: str = "30d"):
+async def get_overview(period: str = "30d", user_id: Optional[str] = None):
     days = parse_period(period)
     records = get_records_for_period(days)
     prev_records = get_records_for_previous_period(days)
+
+    if user_id:
+        records = [r for r in records if r["user_id"] == user_id]
+        prev_records = [r for r in prev_records if r["user_id"] == user_id]
 
     # Compute current period KPIs
     total_input = sum(r["input_tokens"] for r in records)
@@ -383,6 +401,78 @@ async def get_recommendations():
     # Sort by estimated saving descending
     recommendations.sort(key=lambda x: x["estimated_monthly_saving_usd"], reverse=True)
     return recommendations
+
+
+@app.get("/api/cost-breakdown")
+async def get_cost_breakdown(period: str = "30d", user_id: Optional[str] = None):
+    days = parse_period(period)
+    records = get_records_for_period(days)
+
+    if user_id:
+        records = [r for r in records if r["user_id"] == user_id]
+
+    # Cost by token type (recompute from token counts + pricing)
+    input_cost = 0.0
+    output_cost = 0.0
+    cache_read_cost = 0.0
+    cache_write_cost = 0.0
+    input_tokens = output_tokens = cache_read_tokens = cache_write_tokens = 0
+
+    for r in records:
+        p = PRICING.get(r["model"])
+        if not p:
+            continue
+        input_cost += r["input_tokens"] * p["input"] / 1_000_000
+        output_cost += r["output_tokens"] * p["output"] / 1_000_000
+        cache_read_cost += r["cache_read_tokens"] * p["cache_read"] / 1_000_000
+        cache_write_cost += r["cache_write_tokens"] * p["cache_write"] / 1_000_000
+        input_tokens += r["input_tokens"]
+        output_tokens += r["output_tokens"]
+        cache_read_tokens += r["cache_read_tokens"]
+        cache_write_tokens += r["cache_write_tokens"]
+
+    by_token_type = [
+        {"type": "Input", "cost_usd": round(input_cost, 4), "tokens": input_tokens},
+        {"type": "Output", "cost_usd": round(output_cost, 4), "tokens": output_tokens},
+        {"type": "Cache Read", "cost_usd": round(cache_read_cost, 4), "tokens": cache_read_tokens},
+        {"type": "Cache Write", "cost_usd": round(cache_write_cost, 4), "tokens": cache_write_tokens},
+    ]
+
+    # Cost by SDLC activity
+    activity_data: Dict[str, Dict[str, float]] = defaultdict(lambda: {"cost_usd": 0.0, "tokens": 0.0})
+    for r in records:
+        activity = r.get("activity", "Development")
+        tokens = r["input_tokens"] + r["output_tokens"] + r["cache_read_tokens"] + r["cache_write_tokens"]
+        activity_data[activity]["cost_usd"] += r["cost_usd"]
+        activity_data[activity]["tokens"] += tokens
+
+    by_activity = sorted(
+        [
+            {"activity": act, "cost_usd": round(v["cost_usd"], 4), "tokens": int(v["tokens"])}
+            for act, v in activity_data.items()
+        ],
+        key=lambda x: -x["cost_usd"],
+    )
+
+    return {
+        "by_token_type": [x for x in by_token_type if x["tokens"] > 0],
+        "by_activity": by_activity,
+    }
+
+
+@app.get("/api/data-source")
+async def get_data_source():
+    records = get_all_records()
+    dates = sorted(r["date"] for r in records) if records else []
+    return {
+        "source": DATA_SOURCE,
+        "record_count": len(records),
+        "date_range": {
+            "from": dates[0] if dates else None,
+            "to": dates[-1] if dates else None,
+        },
+        "user_count": len(set(r["user_id"] for r in records)),
+    }
 
 
 if __name__ == "__main__":

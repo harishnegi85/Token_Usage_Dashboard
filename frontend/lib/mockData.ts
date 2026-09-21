@@ -1,4 +1,4 @@
-import type { OverviewData, UserSummary, ModelData, Recommendation, CostBreakdown } from './parseClaudeData'
+import type { OverviewData, UserSummary, ModelData, Recommendation, CostBreakdown, TrendsData } from './parseClaudeData'
 
 function mockDates(days = 30): string[] {
   const dates: string[] = []
@@ -102,5 +102,46 @@ export function getMockCostBreakdown(): CostBreakdown {
     by_activity: [
       { activity: 'Development', cost_usd: 2.87, tokens: 795000 },
     ],
+  }
+}
+
+export function getMockTrends(): TrendsData {
+  const weeklyBase  = [420000, 510000, 380000, 595000, 630000, 480000, 720000, 690000]
+  const monthlyCost = [1.80, 2.10, 1.65, 2.40, 2.95, 3.20]
+  const monthNames  = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
+
+  const weekly = weeklyBase.map((tokens, i) => ({
+    label: `W${i + 1}`,
+    startDate: '',
+    tokens,
+    cost: Math.round(tokens * 0.0000038 * 100) / 100,
+    haiku_tokens:  Math.round(tokens * 0.60),
+    sonnet_tokens: Math.round(tokens * 0.32),
+    opus_tokens:   Math.round(tokens * 0.08),
+  }))
+
+  const monthly = monthNames.map((label, i) => {
+    const tokens = Math.round(monthlyCost[i] / 0.0000038)
+    return {
+      label,
+      startDate: '',
+      tokens,
+      cost: monthlyCost[i],
+      haiku_tokens:  Math.round(tokens * 0.60),
+      sonnet_tokens: Math.round(tokens * 0.32),
+      opus_tokens:   Math.round(tokens * 0.08),
+    }
+  })
+
+  const curr = weekly[7]; const prev = weekly[6]
+  const currM = monthly[5]; const prevM = monthly[4]
+
+  function dp(a: number, b: number) { return b === 0 ? 0 : Math.round((a - b) / b * 1000) / 10 }
+
+  return {
+    weekly,
+    monthly,
+    weekGrowth:  { tokens: dp(curr.tokens, prev.tokens),   cost: dp(curr.cost, prev.cost) },
+    monthGrowth: { tokens: dp(currM.tokens, prevM.tokens), cost: dp(currM.cost, prevM.cost) },
   }
 }

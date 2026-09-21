@@ -432,6 +432,78 @@ export function computeRecommendations(users: UserSummary[]): Recommendation[] {
   return recs
 }
 
+export interface TrendBucket {
+  label: string
+  startDate: string
+  tokens: number
+  cost: number
+  haiku_tokens: number
+  sonnet_tokens: number
+  opus_tokens: number
+}
+
+export interface TrendsData {
+  weekly: TrendBucket[]
+  monthly: TrendBucket[]
+  weekGrowth: { tokens: number; cost: number }
+  monthGrowth: { tokens: number; cost: number }
+}
+
+export function computeTrends(records: UsageRecord[]): TrendsData {
+  function bucketTokens(recs: UsageRecord[]) {
+    return {
+      tokens: recs.reduce((s, r) => s + r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_write_tokens, 0),
+      cost: recs.reduce((s, r) => s + r.cost_usd, 0),
+      haiku_tokens: recs.filter(r => r.model === 'claude-haiku-4-5').reduce((s, r) => s + r.input_tokens + r.output_tokens, 0),
+      sonnet_tokens: recs.filter(r => r.model === 'claude-sonnet-4-6').reduce((s, r) => s + r.input_tokens + r.output_tokens, 0),
+      opus_tokens: recs.filter(r => r.model === 'claude-opus-4-8').reduce((s, r) => s + r.input_tokens + r.output_tokens, 0),
+    }
+  }
+
+  // Weekly: last 8 weeks
+  const weekly: TrendBucket[] = []
+  for (let w = 7; w >= 0; w--) {
+    const end = new Date(); end.setDate(end.getDate() - w * 7)
+    const start = new Date(end); start.setDate(start.getDate() - 6)
+    const startStr = start.toISOString().slice(0, 10)
+    const endStr = end.toISOString().slice(0, 10)
+    const recs = records.filter(r => r.date >= startStr && r.date <= endStr)
+    const wNum = 8 - w
+    weekly.push({ label: `W${wNum}`, startDate: startStr, ...bucketTokens(recs) })
+  }
+
+  // Monthly: last 6 months
+  const monthly: TrendBucket[] = []
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  for (let m = 5; m >= 0; m--) {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - m)
+    const year = d.getFullYear(); const month = d.getMonth()
+    const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const endDate = new Date(year, month + 1, 0)
+    const endStr = endDate.toISOString().slice(0, 10)
+    const recs = records.filter(r => r.date >= startStr && r.date <= endStr)
+    monthly.push({ label: monthNames[month], startDate: startStr, ...bucketTokens(recs) })
+  }
+
+  const curr = weekly[weekly.length - 1]
+  const prev = weekly[weekly.length - 2]
+  const currM = monthly[monthly.length - 1]
+  const prevM = monthly[monthly.length - 2]
+
+  return {
+    weekly,
+    monthly,
+    weekGrowth: {
+      tokens: deltaPct(curr.tokens, prev.tokens),
+      cost: deltaPct(curr.cost, prev.cost),
+    },
+    monthGrowth: {
+      tokens: deltaPct(currM.tokens, prevM.tokens),
+      cost: deltaPct(currM.cost, prevM.cost),
+    },
+  }
+}
+
 export function computeCostBreakdown(records: UsageRecord[], days = 30): CostBreakdown {
   const curr = filterByPeriod(records, days)
   let inputCost = 0, outputCost = 0, cacheReadCost = 0, cacheWriteCost = 0

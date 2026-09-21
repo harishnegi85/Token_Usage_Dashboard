@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react'
 import {
-  UsageRecord, OverviewData, UserSummary, ModelData, Recommendation, CostBreakdown,
+  UsageRecord, OverviewData, UserSummary, ModelData, Recommendation, CostBreakdown, TrendsData,
   parseClaudeFolder, parseClaudeFiles,
-  computeOverview, computeUsers, computeModelMix, computeRecommendations, computeCostBreakdown,
+  computeOverview, computeUsers, computeModelMix, computeRecommendations, computeCostBreakdown, computeTrends,
 } from './parseClaudeData'
 import {
-  getMockOverview, getMockUsers, getMockModelMix, getMockRecommendations, getMockCostBreakdown,
+  getMockOverview, getMockUsers, getMockModelMix, getMockRecommendations, getMockCostBreakdown, getMockTrends,
 } from './mockData'
 
 export type ViewMode = 'demo' | 'user'
@@ -25,6 +25,7 @@ interface DataContextValue {
   modelMix: ModelData[]
   recommendations: Recommendation[]
   costBreakdown: CostBreakdown
+  trends: TrendsData
   loadFolder: (dirHandle: FileSystemDirectoryHandle) => Promise<void>
   loadFiles: (files: FileList) => Promise<void>
 }
@@ -93,6 +94,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     modelMix: useMock ? getMockModelMix() : computeModelMix(records),
     recommendations: useMock ? getMockRecommendations() : computeRecommendations(users),
     costBreakdown: useMock ? getMockCostBreakdown() : computeCostBreakdown(records),
+    trends: useMock ? getMockTrends() : computeTrends(records),
     loadFolder,
     loadFiles,
   }

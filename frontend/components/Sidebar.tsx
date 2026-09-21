@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, Users, PieChart, Lightbulb, Zap } from 'lucide-react'
+import { BarChart3, Users, PieChart, Lightbulb, TrendingUp, Zap } from 'lucide-react'
 
 const navItems = [
-  { href: '/overview', label: 'Overview', icon: BarChart3 },
-  { href: '/users', label: 'Users', icon: Users },
-  { href: '/model-mix', label: 'Model Mix', icon: PieChart },
+  { href: '/overview',        label: 'Overview',        icon: BarChart3 },
+  { href: '/trends',          label: 'Trends',          icon: TrendingUp },
+  { href: '/users',           label: 'Users',           icon: Users },
+  { href: '/model-mix',       label: 'Model Mix',       icon: PieChart },
   { href: '/recommendations', label: 'Recommendations', icon: Lightbulb },
 ]
 

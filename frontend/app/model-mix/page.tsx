@@ -1,17 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-
-const API = 'http://localhost:8080'
-
-interface ModelData {
-  model: string
-  tokens: number
-  cost: number
-  pct_tokens: number
-  pct_cost: number
-}
+import { useDataContext } from '@/lib/DataContext'
+import type { ModelData } from '@/lib/parseClaudeData'
 
 const MODEL_COLORS: Record<string, string> = {
   'claude-haiku-4-5': '#22d3ee',
@@ -31,9 +22,9 @@ function formatTokens(n: number): string {
   return n.toLocaleString()
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: ModelData }[] }) => {
   if (!active || !payload?.length) return null
-  const d = payload[0].payload as ModelData
+  const d = payload[0].payload
   return (
     <div className="rounded-lg p-3 border text-xs" style={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f1f5f9' }}>
       <div className="font-semibold mb-2">{MODEL_LABELS[d.model] || d.model}</div>
@@ -46,38 +37,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 }
 
 export default function ModelMixPage() {
-  const [data, setData] = useState<ModelData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch(`${API}/api/model-mix`)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(setData)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: '#94a3b8' }}>Loading model mix...</div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-sm" style={{ color: '#f87171' }}>
-          Failed to load data: {error}
-        </div>
-      </div>
-    )
-  }
+  const { modelMix: data } = useDataContext()
 
   const totalCost = data.reduce((s, d) => s + d.cost, 0)
   const totalTokens = data.reduce((s, d) => s + d.tokens, 0)
@@ -87,11 +47,10 @@ export default function ModelMixPage() {
       <div>
         <h1 className="text-xl font-bold" style={{ color: '#f1f5f9' }}>Model Mix</h1>
         <p className="text-sm mt-1" style={{ color: '#94a3b8' }}>
-          Org-wide model distribution over the last 30 days
+          Model distribution over the last 30 days
         </p>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Total Tokens', value: formatTokens(totalTokens) },
@@ -105,9 +64,7 @@ export default function ModelMixPage() {
         ))}
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Token distribution pie */}
         <div className="rounded-xl p-5 border" style={{ backgroundColor: '#1e293b', borderColor: '#334155' }}>
           <h3 className="text-sm font-semibold mb-2" style={{ color: '#f1f5f9' }}>Token Distribution</h3>
           <ResponsiveContainer width="100%" height={280}>
@@ -119,17 +76,13 @@ export default function ModelMixPage() {
               </Pie>
               <Tooltip content={<CustomTooltip />} />
               <Legend
-                formatter={(value) => {
-                  const item = data.find(d => d.model === value)
-                  return <span style={{ color: '#94a3b8', fontSize: 12 }}>{MODEL_LABELS[value] || value}</span>
-                }}
                 payload={data.map(d => ({ value: d.model, color: MODEL_COLORS[d.model] || '#94a3b8', type: 'circle' as const }))}
+                formatter={(value) => <span style={{ color: '#94a3b8', fontSize: 12 }}>{MODEL_LABELS[value] || value}</span>}
               />
             </PieChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Cost distribution pie */}
         <div className="rounded-xl p-5 border" style={{ backgroundColor: '#1e293b', borderColor: '#334155' }}>
           <h3 className="text-sm font-semibold mb-2" style={{ color: '#f1f5f9' }}>Cost Distribution</h3>
           <ResponsiveContainer width="100%" height={280}>
@@ -141,15 +94,14 @@ export default function ModelMixPage() {
               </Pie>
               <Tooltip content={<CustomTooltip />} />
               <Legend
-                formatter={(value) => <span style={{ color: '#94a3b8', fontSize: 12 }}>{MODEL_LABELS[value] || value}</span>}
                 payload={data.map(d => ({ value: d.model, color: MODEL_COLORS[d.model] || '#94a3b8', type: 'circle' as const }))}
+                formatter={(value) => <span style={{ color: '#94a3b8', fontSize: 12 }}>{MODEL_LABELS[value] || value}</span>}
               />
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Details table */}
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#334155' }}>
         <table className="w-full text-sm">
           <thead>
@@ -194,4 +146,3 @@ export default function ModelMixPage() {
     </div>
   )
 }
-

@@ -1,0 +1,95 @@
+'use client'
+
+import { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react'
+import {
+  UsageRecord, OverviewData, UserSummary, ModelData, Recommendation, CostBreakdown,
+  parseClaudeFolder, parseClaudeFiles,
+  computeOverview, computeUsers, computeModelMix, computeRecommendations, computeCostBreakdown,
+} from './parseClaudeData'
+import {
+  getMockOverview, getMockUsers, getMockModelMix, getMockRecommendations, getMockCostBreakdown,
+} from './mockData'
+
+interface DataContextValue {
+  records: UsageRecord[]
+  dataSource: 'folder' | 'mock'
+  folderName: string | null
+  loading: boolean
+  error: string | null
+  overview: OverviewData
+  users: UserSummary[]
+  modelMix: ModelData[]
+  recommendations: Recommendation[]
+  costBreakdown: CostBreakdown
+  loadFolder: (dirHandle: FileSystemDirectoryHandle) => Promise<void>
+  loadFiles: (files: FileList) => Promise<void>
+}
+
+const DataContext = createContext<DataContextValue | null>(null)
+
+export function DataProvider({ children }: { children: ReactNode }) {
+  const [records, setRecords] = useState<UsageRecord[]>([])
+  const [dataSource, setDataSource] = useState<'folder' | 'mock'>('mock')
+  const [folderName, setFolderName] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const processRecords = useCallback((recs: UsageRecord[], name: string) => {
+    setRecords(recs)
+    setFolderName(name)
+    setDataSource('folder')
+  }, [])
+
+  const loadFolder = useCallback(async (dirHandle: FileSystemDirectoryHandle) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const recs = await parseClaudeFolder(dirHandle)
+      processRecords(recs, dirHandle.name)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to read folder')
+    } finally {
+      setLoading(false)
+    }
+  }, [processRecords])
+
+  const loadFiles = useCallback(async (files: FileList) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const recs = await parseClaudeFiles(files)
+      processRecords(recs, 'uploaded files')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to read files')
+    } finally {
+      setLoading(false)
+    }
+  }, [processRecords])
+
+  const isMock = dataSource === 'mock'
+
+  const users = useMemo(() => isMock ? getMockUsers() : computeUsers(records), [isMock, records])
+
+  const value: DataContextValue = {
+    records,
+    dataSource,
+    folderName,
+    loading,
+    error,
+    overview: isMock ? getMockOverview() : computeOverview(records),
+    users,
+    modelMix: isMock ? getMockModelMix() : computeModelMix(records),
+    recommendations: isMock ? getMockRecommendations() : computeRecommendations(users),
+    costBreakdown: isMock ? getMockCostBreakdown() : computeCostBreakdown(records),
+    loadFolder,
+    loadFiles,
+  }
+
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
+}
+
+export function useDataContext(): DataContextValue {
+  const ctx = useContext(DataContext)
+  if (!ctx) throw new Error('useDataContext must be used within DataProvider')
+  return ctx
+}

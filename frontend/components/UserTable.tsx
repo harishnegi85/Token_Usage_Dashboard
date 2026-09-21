@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 
 interface UserSummary {
@@ -18,6 +17,7 @@ interface UserSummary {
 
 interface Props {
   users: UserSummary[]
+  onRowClick?: (userId: string) => void
 }
 
 type SortKey = keyof Pick<UserSummary, 'request_count' | 'input_tokens' | 'output_tokens' | 'cost_usd' | 'cache_hit_rate'>
@@ -47,8 +47,7 @@ function shortModel(model: string): string {
   return model
 }
 
-export default function UserTable({ users }: Props) {
-  const router = useRouter()
+export default function UserTable({ users, onRowClick }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('cost_usd')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -120,7 +119,7 @@ export default function UserTable({ users }: Props) {
                 backgroundColor: idx % 2 === 0 ? '#1e293b' : 'rgba(30,41,59,0.5)',
                 borderBottom: '1px solid #334155',
               }}
-              onClick={() => router.push(`/users/${encodeURIComponent(user.user_id)}`)}
+              onClick={() => onRowClick?.(user.user_id)}
               onMouseEnter={e => {
                 (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'rgba(99,102,241,0.08)'
               }}

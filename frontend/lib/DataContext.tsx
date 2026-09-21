@@ -10,10 +10,14 @@ import {
   getMockOverview, getMockUsers, getMockModelMix, getMockRecommendations, getMockCostBreakdown,
 } from './mockData'
 
+export type ViewMode = 'demo' | 'user'
+
 interface DataContextValue {
   records: UsageRecord[]
   dataSource: 'folder' | 'mock'
   folderName: string | null
+  viewMode: ViewMode
+  setViewMode: (mode: ViewMode) => void
   loading: boolean
   error: string | null
   overview: OverviewData
@@ -31,6 +35,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [records, setRecords] = useState<UsageRecord[]>([])
   const [dataSource, setDataSource] = useState<'folder' | 'mock'>('mock')
   const [folderName, setFolderName] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('demo')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,6 +43,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setRecords(recs)
     setFolderName(name)
     setDataSource('folder')
+    setViewMode('user')
   }, [])
 
   const loadFolder = useCallback(async (dirHandle: FileSystemDirectoryHandle) => {
@@ -66,21 +72,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [processRecords])
 
-  const isMock = dataSource === 'mock'
+  // Use mock data when in demo mode OR when user mode but no folder loaded yet
+  const useMock = viewMode === 'demo' || dataSource === 'mock'
 
-  const users = useMemo(() => isMock ? getMockUsers() : computeUsers(records), [isMock, records])
+  const users = useMemo(
+    () => useMock ? getMockUsers() : computeUsers(records),
+    [useMock, records]
+  )
 
   const value: DataContextValue = {
     records,
     dataSource,
     folderName,
+    viewMode,
+    setViewMode,
     loading,
     error,
-    overview: isMock ? getMockOverview() : computeOverview(records),
+    overview: useMock ? getMockOverview() : computeOverview(records),
     users,
-    modelMix: isMock ? getMockModelMix() : computeModelMix(records),
-    recommendations: isMock ? getMockRecommendations() : computeRecommendations(users),
-    costBreakdown: isMock ? getMockCostBreakdown() : computeCostBreakdown(records),
+    modelMix: useMock ? getMockModelMix() : computeModelMix(records),
+    recommendations: useMock ? getMockRecommendations() : computeRecommendations(users),
+    costBreakdown: useMock ? getMockCostBreakdown() : computeCostBreakdown(records),
     loadFolder,
     loadFiles,
   }

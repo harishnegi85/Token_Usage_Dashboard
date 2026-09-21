@@ -2,10 +2,17 @@
 
 import { useRef, useState } from 'react'
 import { FolderOpen, BarChart2, User, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react'
-import { useDataContext } from '@/lib/DataContext'
+import { useDataContext, Period } from '@/lib/DataContext'
 
 export default function FolderPicker() {
-  const { viewMode, setViewMode, dataSource, folderName, records, loading, error, loadFolder, loadFiles } = useDataContext()
+  const { viewMode, setViewMode, period, setPeriod, dataSource, records, loading, error, loadFolder, loadFiles } = useDataContext()
+
+  const PERIODS: { label: string; value: Period }[] = [
+    { label: '7d',  value: 7 },
+    { label: '30d', value: 30 },
+    { label: '90d', value: 90 },
+    { label: 'All', value: null },
+  ]
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingHandle, setPendingHandle] = useState<FileSystemDirectoryHandle | null>(null)
   const [pendingName, setPendingName] = useState<string | null>(null)
@@ -85,6 +92,27 @@ export default function FolderPicker() {
           <User size={14} />
           My Data
         </button>
+      </div>
+
+      {/* Period selector */}
+      <div
+        className="flex gap-1 p-1 rounded-lg"
+        style={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
+      >
+        {PERIODS.map(({ label, value }) => (
+          <button
+            key={label}
+            onClick={() => setPeriod(value)}
+            className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+            style={{
+              backgroundColor: period === value ? '#334155' : 'transparent',
+              color: period === value ? '#f1f5f9' : '#94a3b8',
+              border: 'none', cursor: 'pointer',
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Right side: status / folder picker */}

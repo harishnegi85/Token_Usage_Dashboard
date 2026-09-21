@@ -11,6 +11,7 @@ import {
 } from './mockData'
 
 export type ViewMode = 'demo' | 'user'
+export type Period = 7 | 30 | 90 | null   // null = all time
 
 interface DataContextValue {
   records: UsageRecord[]
@@ -18,6 +19,8 @@ interface DataContextValue {
   folderName: string | null
   viewMode: ViewMode
   setViewMode: (mode: ViewMode) => void
+  period: Period
+  setPeriod: (p: Period) => void
   loading: boolean
   error: string | null
   overview: OverviewData
@@ -37,6 +40,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [dataSource, setDataSource] = useState<'folder' | 'mock'>('mock')
   const [folderName, setFolderName] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('demo')
+  const [period, setPeriod] = useState<Period>(30)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -76,9 +80,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Use mock data when in demo mode OR when user mode but no folder loaded yet
   const useMock = viewMode === 'demo' || dataSource === 'mock'
 
+  const days = period ?? 36500
   const users = useMemo(
-    () => useMock ? getMockUsers() : computeUsers(records),
-    [useMock, records]
+    () => useMock ? getMockUsers() : computeUsers(records, days),
+    [useMock, records, days]
   )
 
   const value: DataContextValue = {
@@ -87,13 +92,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     folderName,
     viewMode,
     setViewMode,
+    period,
+    setPeriod,
     loading,
     error,
-    overview: useMock ? getMockOverview() : computeOverview(records),
+    overview: useMock ? getMockOverview() : computeOverview(records, days),
     users,
-    modelMix: useMock ? getMockModelMix() : computeModelMix(records),
+    modelMix: useMock ? getMockModelMix() : computeModelMix(records, days),
     recommendations: useMock ? getMockRecommendations() : computeRecommendations(users),
-    costBreakdown: useMock ? getMockCostBreakdown() : computeCostBreakdown(records),
+    costBreakdown: useMock ? getMockCostBreakdown() : computeCostBreakdown(records, days),
     trends: useMock ? getMockTrends() : computeTrends(records),
     loadFolder,
     loadFiles,

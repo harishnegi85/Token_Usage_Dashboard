@@ -178,26 +178,52 @@ function aggregateEntries(entries: RawEntry[]): UsageRecord[] {
   })
 }
 
-export async function parseClaudeFolder(dirHandle: FileSystemDirectoryHandle): Promise<UsageRecord[]> {
-  const allEntries: RawEntry[] = []
+async function readJsonlFromProjectDir(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for await (const [, projectHandle] of (dirHandle as any).entries()) {
-    if (projectHandle.kind !== 'directory') continue
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for await (const [fileName, fileHandle] of (projectHandle as any).entries()) {
-      if (fileHandle.kind !== 'file') continue
-      if (!fileName.endsWith('.jsonl')) continue
-      if (fileName.startsWith('agent-')) continue
-      try {
-        const file = await fileHandle.getFile()
-        const text = await file.text()
-        const entries = await parseJsonlText(text)
-        allEntries.push(...entries)
-      } catch {
-        // skip unreadable files
-      }
+  projectHandle: any,
+  allEntries: RawEntry[]
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for await (const [fileName, fileHandle] of (projectHandle as any).entries()) {
+    if (fileHandle.kind !== 'file') continue
+    if (!fileName.endsWith('.jsonl')) continue
+    if (fileName.startsWith('agent-')) continue
+    try {
+      const file = await fileHandle.getFile()
+      const text = await file.text()
+      const entries = await parseJsonlText(text)
+      allEntries.push(...entries)
+    } catch {
+      // skip unreadable files
     }
   }
+}
+
+export async function parseClaudeFolder(dirHandle: FileSystemDirectoryHandle): Promise<UsageRecord[]> {
+  const allEntries: RawEntry[] = []
+  let projectsHandle: FileSystemDirectoryHandle | null = null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for await (const [name, handle] of (dirHandle as any).entries()) {
+    if (handle.kind !== 'directory') continue
+
+    // User selected .claude root — find the projects subfolder
+    if (name === 'projects') {
+      projectsHandle = handle
+      break
+    }
+  }
+
+  // If we found a projects subfolder, use it; otherwise treat dirHandle as the projects folder
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const root: any = projectsHandle ?? dirHandle
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for await (const [, projectHandle] of (root as any).entries()) {
+    if (projectHandle.kind !== 'directory') continue
+    await readJsonlFromProjectDir(projectHandle, allEntries)
+  }
+
   return aggregateEntries(allEntries)
 }
 

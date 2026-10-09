@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,12 +9,13 @@ venv/
 # Node / Next.js
 frontend/node_modules/
 frontend/.next/
+frontend/out/
 frontend/.env*.local
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Claude Code — share skills, ignore local settings
+# Claude Code - share skills, ignore local settings
 .claude/settings.local.json
 .claude/settings.json

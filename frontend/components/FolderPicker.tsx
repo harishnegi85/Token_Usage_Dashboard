@@ -5,7 +5,7 @@ import { FolderOpen, BarChart2, User, CheckCircle, RefreshCw, AlertCircle, Shiel
 import { useDataContext, Period } from '@/lib/DataContext'
 
 export default function FolderPicker() {
-  const { viewMode, setViewMode, period, setPeriod, dataSource, records, loading, error, loadFiles } = useDataContext()
+  const { viewMode, setViewMode, period, setPeriod, dataSource, records, loading, error, loadFolder, loadFiles } = useDataContext()
 
   const PERIODS: { label: string; value: Period }[] = [
     { label: '7d',  value: 7 },
@@ -14,9 +14,30 @@ export default function FolderPicker() {
     { label: 'All', value: null },
   ]
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [pendingHandle, setPendingHandle] = useState<FileSystemDirectoryHandle | null>(null)
+  const [pendingName, setPendingName] = useState<string | null>(null)
 
-  function handlePickFolder() {
-    fileInputRef.current?.click()
+  async function handlePickFolder() {
+    const win = window as Window & { showDirectoryPicker?: (opts?: { mode?: string }) => Promise<FileSystemDirectoryHandle> }
+    if (typeof win.showDirectoryPicker === 'function') {
+      try {
+        const dirHandle = await win.showDirectoryPicker({ mode: 'read' })
+        setPendingHandle(dirHandle)
+        setPendingName(dirHandle.name)
+      } catch {
+        // user cancelled
+      }
+    } else {
+      fileInputRef.current?.click()
+    }
+  }
+
+  async function handleConfirmLoad() {
+    if (!pendingHandle) return
+    const h = pendingHandle
+    setPendingHandle(null)
+    setPendingName(null)
+    await loadFolder(h)
   }
 
   async function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -108,8 +129,32 @@ export default function FolderPicker() {
           </div>
         )}
 
+        {/* Pending folder confirm */}
+        {pendingName && !loading && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: '#94a3b8' }}>
+              <FolderOpen size={13} color="#818cf8" />
+              <code style={{ color: '#818cf8' }}>{pendingName}</code>
+            </div>
+            <button
+              onClick={() => { setPendingHandle(null); setPendingName(null) }}
+              className="text-xs px-2 py-1 rounded hover:opacity-80"
+              style={{ backgroundColor: 'rgba(148,163,184,0.1)', color: '#94a3b8', border: '1px solid rgba(148,163,184,0.2)', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmLoad}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium hover:opacity-80"
+              style={{ backgroundColor: '#6366f1', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              <FolderOpen size={12} /> Load Data
+            </button>
+          </div>
+        )}
+
         {/* Real data loaded */}
-        {hasRealData && !loading && (
+        {hasRealData && !pendingName && !loading && (
           <div className="flex items-center gap-2">
             <div
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
@@ -128,8 +173,8 @@ export default function FolderPicker() {
           </div>
         )}
 
-        {/* User tab active, no data */}
-        {viewMode === 'user' && !hasRealData && !loading && (
+        {/* User tab active, no data, no pending */}
+        {viewMode === 'user' && !hasRealData && !pendingName && !loading && (
           <button
             onClick={handlePickFolder}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
@@ -165,10 +210,10 @@ export default function FolderPicker() {
         <ShieldCheck size={15} style={{ color: '#818cf8', flexShrink: 0, marginTop: 1 }} />
         <span>
           <span style={{ color: '#c7d2fe', fontWeight: 600 }}>Privacy notice: </span>
-          Your browser will open a standard file picker. The files you select are read
-          locally inside your browser tab only —{' '}
-          <strong style={{ color: '#e2e8f0' }}>nothing is uploaded to GitHub or any server.</strong>
-          {' '}All parsing happens on your device and the data never leaves your browser.
+          Your browser will ask <em>&ldquo;harishnegi85.github.io wants to view files&rdquo;</em> — click <strong style={{ color: '#e2e8f0' }}>View files</strong> to continue.
+          This only means the JavaScript on this page can read your folder locally inside your browser tab.{' '}
+          <strong style={{ color: '#e2e8f0' }}>Nothing is uploaded to GitHub or any server</strong> —
+          all parsing happens on your device and the data never leaves your browser.
         </span>
       </div>
     )}
